@@ -1,0 +1,93 @@
+# Build results
+[Bb]in/
+[Oo]bj/
+*.obj
+*.iobj
+*.ipdb
+*.pdb
+*.idb
+*.ilk
+*.log
+*.tlog
+*.lastbuildstate
+*.VC.db
+*.VC.VC.opendb
+*.cachefile
+*.user
+*.suo
+*.opensdf
+*.sdf
+*.ncb
+*.aps
+*.res
+*.pch
+*.tmp
+*.bak
+
+# Build artifacts
+*.exe
+*.dll
+*.lib
+*.exp
+*.hex
+*.out
+*.map
+
+# Debugging files
+*.dbg
+*.dmp
+
+# Auto-generated files
+*.manifest
+*.browser
+*.sbr
+
+# VS Code folders
+.vscode/
+
+# Visual Studio specific
+*.sdf
+*.ipch/
+*.dbmdl
+
+# Temporary folders
+_ReSharper*/
+*.vs/
+*.idea/
+*.ipynb_checkpoints/
+
+# NuGet
+*.nupkg
+packages/
+
+# Crash reports
+CrashDump*.dmp
+
+# Other temporary
+*.tlog/
+*.log
+*.tmp
+*.bak
+*.scc
+*.orig
+*.mdf
+*.ldf
+*.log
+
+# 기타 수동 리소스 파일 무시 예시 (빌드에서 생성된 경우)
+Release/
+Debug/
+x64/
+x86/
+ARM/
+KakaoTalkDelAD/
+
+# CMake (만약 사용하는 경우)
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+Makefile
+build/
+
+# 기타 IDE 캐시
+ipch/
