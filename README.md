@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="KakaoTalkDelAD.ico"  width="200"/>
+  <img src="KTDelAD.ico"  width="200"/>
   <h1 align="center">KakaoTalkDelAD</h1>
   <h4 align="center">1회 실행형 카톡 광고 제거</h4>
 </div>
@@ -11,7 +11,7 @@
 
 ## 🖥️ 설명
 
-![KakaoTalkDelAD](https://raw.githubusercontent.com/HiSkyZen/KakaoTalkDelAD/master/Docs/KakaoTalkDelAD.png)
+![KakaoTalkDelAD](https://raw.githubusercontent.com/HiSkyZen/KakaoTalkDelAD/main/Docs/KakaoTalkDelAD.png)
 
 **KakaoTalkDelAD** 카카오톡 광고 제거 프로그램. blurfx님의 코드를 참고해서 만들었습니다. https://github.com/blurfx/KakaoTalkAdBlock
 
