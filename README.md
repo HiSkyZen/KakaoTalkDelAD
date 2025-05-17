@@ -1,7 +1,7 @@
 <div align="center">
   <img src="KTDelAD.ico"  width="200"/>
   <h1 align="center">KakaoTalkDelAD</h1>
-  <h4 align="center">1회 실행형 카톡 광고 제거</h4>
+  <h4 align="center">1회 실행형 카카오톡 광고 제거기</h4>
 </div>
 
 <div align="center">
@@ -23,14 +23,13 @@
 ## ✨ 주요 특징
 
 - 🔍 관리자 권한 없이도 작동
-- 📐 가볍고 간단한 무설치 프로그램 (200KB 수준)
+- 📐 가볍고 간단한 무설치 프로그램 (350~380KB 수준)
 - ✅ 1회 실행 후 종료 (백그라운드 미상주)
 
 ---
 
 ## 시스템 요구 사항
  * Windows 10 또는 Windows 11
- * [Visual C++ 2015-2022 Redistributable](https://learn.microsoft.com/ko-kr/cpp/windows/latest-supported-vc-redist?view=msvc-170)
 
 ---
 
@@ -41,6 +40,6 @@
  * C++17 지원
 
 ### 빌드
-KakaoTalkDelAD.sln을 Visual Studio 2022에서 열고 Release x64 또는 Debug x64 구성으로 솔루션을 빌드하세요.
+KakaoTalkDelAD.sln을 Visual Studio 2022에서 열고 원하는 구성을 선택 후 솔루션을 빌드하세요.
 
 ---
