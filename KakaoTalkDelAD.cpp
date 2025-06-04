@@ -22,11 +22,21 @@ using Microsoft::WRL::ComPtr;
 // -----------------------------------------------------------------------------
 // 컴파일-타임 상수
 // -----------------------------------------------------------------------------
-constexpr int   CLIENT_W_PX = 440;  // physical pixels (no DPI scaling)
-constexpr int   CLIENT_H_PX = 200;
-constexpr float INTERNAL_DPI = 120.0f;  // assume 150 % when converting Px↔︎DIP
-constexpr float SCALE_PX_TO_DIP = 96.0f / INTERNAL_DPI;  // ≃ 0.6666…
-constexpr float SCALE_DIP_TO_PX = INTERNAL_DPI / 96.0f;  // = 1.5
+// 디자인 크기 (DIP 단위)
+constexpr float CLIENT_W_DIP = 352.0f;
+constexpr float CLIENT_H_DIP = 160.0f;
+constexpr DWORD WIN_STYLE = WS_OVERLAPPEDWINDOW & ~(WS_THICKFRAME | WS_MAXIMIZEBOX);
+// Current monitor DPI. Updated at runtime from WM_CREATE/WM_DPICHANGED.
+static float g_dpi = 96.0f;
+static float g_scalePxToDip = 1.0f;
+static float g_scaleDipToPx = 1.0f;
+
+static void UpdateDpi(float dpi)
+{
+    g_dpi = dpi;
+    g_scalePxToDip = 96.0f / dpi;
+    g_scaleDipToPx = dpi / 96.0f;
+}
 
 constexpr float MARGIN_DIP = 20.0f;
 constexpr float LINE_HEIGHT_DIP = 32.0f;
@@ -214,12 +224,12 @@ static void EnsureRenderTarget()
     RECT rc; GetClientRect(g_hWnd, &rc);
     D2D1_SIZE_U szPx = { UINT(rc.right - rc.left), UINT(rc.bottom - rc.top) };
 
-    // 2) create RT fixed at INTERNAL_DPI
+    // 2) create RT using current DPI
     D2D1_RENDER_TARGET_PROPERTIES rtp =
         D2D1::RenderTargetProperties(
             D2D1_RENDER_TARGET_TYPE_DEFAULT,
             D2D1::PixelFormat(DXGI_FORMAT_UNKNOWN, D2D1_ALPHA_MODE_PREMULTIPLIED),
-            INTERNAL_DPI, INTERNAL_DPI);
+            g_dpi, g_dpi);
 
     g_d2Factory->CreateHwndRenderTarget(rtp,
         D2D1::HwndRenderTargetProperties(g_hWnd, szPx), &g_rt);
@@ -253,8 +263,8 @@ static void OnPaint()
 
     // 전체 크기 (DIP)
     D2D1_SIZE_F szDip = {
-        (float)CLIENT_W_PX * SCALE_PX_TO_DIP,
-        (float)CLIENT_H_PX * SCALE_PX_TO_DIP };
+        CLIENT_W_DIP,
+        CLIENT_H_DIP };
 
     for (int i = 0; i < 3; ++i) {
         // 상태 텍스트
@@ -282,16 +292,27 @@ static void OnPaint()
     // GitHub 링크 (step ≥ 3)
     if (g_step >= 3) {
         float y = MARGIN_DIP + 3 * LINE_HEIGHT_DIP + LINK_SPACING_DIP;
-        g_linkRectDip = D2D1::RectF(0, y, szDip.width, y + LINE_HEIGHT_DIP);
-        //g_rt->DrawTextW(L"GitHub", 6, g_tfCenter.Get(),
-        //    g_linkRectDip, g_brAccent.Get());
+
+        // layout the text centered, then restrict the clickable rect to just
+        // the glyph area so the hitbox doesn't span the entire line
         ComPtr<IDWriteTextLayout> textLayout;
         g_dwFactory->CreateTextLayout(L"GitHub", 6, g_tfCenter.Get(),
-            g_linkRectDip.right - g_linkRectDip.left,
-            g_linkRectDip.bottom - g_linkRectDip.top,
-            &textLayout);
+            CLIENT_W_DIP, LINE_HEIGHT_DIP, &textLayout);
         textLayout->SetUnderline(TRUE, { 0, 6 });
-        g_rt->DrawTextLayout(D2D1::Point2F(g_linkRectDip.left, g_linkRectDip.top),
+        // the layout itself should be left-aligned since we manually position it
+        textLayout->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_LEADING);
+
+        DWRITE_TEXT_METRICS metrics{};
+        textLayout->GetMetrics(&metrics);
+
+        float left = (szDip.width - metrics.widthIncludingTrailingWhitespace) / 2.0f;
+        g_linkRectDip = D2D1::RectF(
+            left,
+            y,
+            left + metrics.widthIncludingTrailingWhitespace,
+            y + metrics.height);
+
+        g_rt->DrawTextLayout(D2D1::Point2F(left, y),
             textLayout.Get(), g_brAccent.Get());
     }
 
@@ -329,6 +350,21 @@ static LRESULT CALLBACK WndProc(HWND wnd, UINT msg, WPARAM wp, LPARAM lp)
         const DWORD pref = 2; // DWM_WINDOW_CORNER_PREFERENCE_ROUND
         DwmSetWindowAttribute(wnd, 33, &pref, sizeof(pref));
 
+        // ensure non-client area also scales with the window DPI
+        EnableNonClientDpiScaling(wnd);
+
+        // set initial DPI scaling and resize if it differs from system default
+        UINT dpi = GetDpiForWindow(wnd);
+        UpdateDpi((float)dpi);
+
+        RECT wr = { 0, 0,
+            (LONG)(CLIENT_W_DIP * g_scaleDipToPx),
+            (LONG)(CLIENT_H_DIP * g_scaleDipToPx) };
+        AdjustWindowRectExForDpi(&wr, WIN_STYLE, FALSE, 0, dpi);
+        SetWindowPos(wnd, nullptr, 0, 0,
+            wr.right - wr.left, wr.bottom - wr.top,
+            SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
+
         g_hWnd = wnd;
         CreateThread(nullptr, 0, Worker, nullptr, 0, nullptr);
         return 0;
@@ -350,6 +386,7 @@ static LRESULT CALLBACK WndProc(HWND wnd, UINT msg, WPARAM wp, LPARAM lp)
         // 2) 새 DPI 값 가져오기
         UINT dpiX = LOWORD(wp);   // X축 DPI
         UINT dpiY = HIWORD(wp);   // Y축 DPI
+        UpdateDpi((float)dpiX);
 
         // 3) 클라이언트 영역 크기 구하고 렌더 타겟 갱신
         RECT rcClient;
@@ -378,8 +415,8 @@ static LRESULT CALLBACK WndProc(HWND wnd, UINT msg, WPARAM wp, LPARAM lp)
         if (g_step < 3) break;
         int px = GET_X_LPARAM(lp);
         int py = GET_Y_LPARAM(lp);
-        float dipX = px * SCALE_PX_TO_DIP;
-        float dipY = py * SCALE_PX_TO_DIP;
+        float dipX = px * g_scalePxToDip;
+        float dipY = py * g_scalePxToDip;
 
         bool over = (dipX >= g_linkRectDip.left && dipX <= g_linkRectDip.right &&
             dipY >= g_linkRectDip.top && dipY <= g_linkRectDip.bottom);
@@ -391,8 +428,8 @@ static LRESULT CALLBACK WndProc(HWND wnd, UINT msg, WPARAM wp, LPARAM lp)
         if (g_step < 3) break;
         int px = GET_X_LPARAM(lp);
         int py = GET_Y_LPARAM(lp);
-        float dipX = px * SCALE_PX_TO_DIP;
-        float dipY = py * SCALE_PX_TO_DIP;
+        float dipX = px * g_scalePxToDip;
+        float dipY = py * g_scalePxToDip;
         if (dipX >= g_linkRectDip.left && dipX <= g_linkRectDip.right &&
             dipY >= g_linkRectDip.top && dipY <= g_linkRectDip.bottom)
         {
@@ -429,8 +466,10 @@ static LRESULT CALLBACK WndProc(HWND wnd, UINT msg, WPARAM wp, LPARAM lp)
 // -----------------------------------------------------------------------------
 int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE, PWSTR, int nShow)
 {
-    // make the process per‑monitor‑aware (optional – won’t react to DPI changes)
-    SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE);
+    // enable per-monitor DPI scaling for the entire process including the
+    // window frame so it follows the monitor DPI
+    SetProcessDpiAwarenessContext(
+        DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
 
     WNDCLASSW wc{};
     wc.lpfnWndProc = WndProc;
@@ -440,17 +479,21 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE, PWSTR, int nShow)
 
     RegisterClassW(&wc);
 
-    // adjust for window chrome once (no DPI math)
-    RECT wr = { 0, 0, CLIENT_W_PX, CLIENT_H_PX };
-    DWORD style = WS_OVERLAPPEDWINDOW & ~(WS_THICKFRAME | WS_MAXIMIZEBOX);
+    // 초기 모니터 DPI 기준으로 창 크기 계산
+    UINT dpi = GetDpiForSystem();
+    UpdateDpi((float)dpi);
 
-    AdjustWindowRect(&wr, style, FALSE);
+    RECT wr = { 0, 0,
+        (LONG)(CLIENT_W_DIP * g_scaleDipToPx),
+        (LONG)(CLIENT_H_DIP * g_scaleDipToPx) };
+
+    AdjustWindowRectExForDpi(&wr, WIN_STYLE, FALSE, 0, dpi);
 
     int winW = wr.right - wr.left;
     int winH = wr.bottom - wr.top;
 
     HWND wnd = CreateWindowW(wc.lpszClassName, L"KakaoTalkDelAD",
-        style, CW_USEDEFAULT, CW_USEDEFAULT, winW, winH,
+        WIN_STYLE, CW_USEDEFAULT, CW_USEDEFAULT, winW, winH,
         nullptr, nullptr, hInst, nullptr);
 
     ShowWindow(wnd, nShow);
